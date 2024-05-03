@@ -1,0 +1,55 @@
+#pragma kernel sort_textures
+#pragma kernel sort_textures_with_depth_complexities
+#pragma kernel blit_stencil_to_color
+
+RWTexture2D<float> texture_a;
+RWTexture2D<float> texture_b;
+int2 texture_resolution;
+
+[numthreads(8,8,1)]
+void sort_textures (uint3 id : SV_DispatchThreadID)
+{
+    if (any(id.xy >= texture_resolution || id.xy < int2(0, 0))) return;
+    
+    float value_a = texture_a[id.xy].r;
+    float value_b = texture_b[id.xy].r;
+    texture_a[id.xy] = min(value_a, value_b);
+    texture_b[id.xy] = max(value_a, value_b);
+}
+
+Texture2D<float> depth_complexities;
+float depth_complexities_max_value;
+int comperison_index;
+
+[numthreads(8, 8, 1)]
+void sort_textures_with_depth_complexities(uint3 id : SV_DispatchThreadID)
+{
+    if (any(id.xy >= texture_resolution || id.xy < int2(0, 0))) return;
+    
+    int depth_complexity = int(depth_complexities[id.xy] * depth_complexities_max_value);
+    
+    float value_a = texture_a[id.xy].r;
+    float value_b = texture_b[id.xy].r;
+    
+    if (depth_complexity == 0)
+        value_a = 1;
+    
+    if (depth_complexity <= comperison_index)
+        value_b = 1;
+    
+    texture_a[id.xy] = min(value_a, value_b);
+    texture_b[id.xy] = max(value_a, value_b);
+}
+
+Texture2D<uint2> stencil_texture;
+RWTexture2D<float> target_color_texture;
+float max_stencil_value;
+// texture_resolution
+
+[numthreads(8, 8, 1)]
+void blit_stencil_to_color(uint3 id : SV_DispatchThreadID)
+{
+    if (any(id.xy >= texture_resolution || id.xy < int2(0, 0))) return;
+    
+    target_color_texture[id.xy] = stencil_texture[id.xy].g / 32.0f;
+}

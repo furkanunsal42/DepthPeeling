@@ -1,0 +1,12 @@
+
+/.vs
+*.csproj
+/Library
+/Logs
+/obj
+/Packages
+/ProjectSettings
+/UserSettings
+DepthPeeling.sln
+*.meta
+.vsconfig
