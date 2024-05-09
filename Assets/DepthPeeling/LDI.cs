@@ -9,16 +9,29 @@ public class LDI : MonoBehaviour
     public List<RenderTexture> ldi_hierarchy = new List<RenderTexture>();
     public Material material_first_pass;
     public Material material_second_pass;
-    public CommandBuffer command_buffer;
-    public Camera camera;
     public ComputeShader compute_ldi;
+    public Camera camera;
+    public uint max_ldi_hierarchy_size;
     public RenderTexture depth_complexities;
-    MeshFilter mesh_filter;
+    public BoxCollider AABB;
 
-    public uint max_ldi_hierarchy_size = 16;
-    void Start()
+    CommandBuffer command_buffer;
+    MeshFilter mesh_filter;
+    
+    ComputeBuffer does_collide_buffer;
+
+    static Vector3 default_camera_position = new Vector3(0, 0, 10);
+    static Vector3 default_camera_target = new Vector3(0, 0, 0);
+    static Vector3 default_camera_viewbox_size = new Vector3(16, 16, 16);
+
+    Dictionary<GameObject, LDI> collisions = new Dictionary<GameObject, LDI>();
+
+    bool is_initialized = false;
+    void init()
     {
-        if(gameObject.TryGetComponent<MeshFilter>(out mesh_filter))
+        if(is_initialized) return;
+
+        if (gameObject.TryGetComponent<MeshFilter>(out mesh_filter))
         {
             for (int i = 0; i < max_ldi_hierarchy_size; i++)
             {
@@ -29,14 +42,20 @@ public class LDI : MonoBehaviour
                 ldi_hierarchy[i].depthStencilFormat = UnityEngine.Experimental.Rendering.GraphicsFormat.D24_UNorm_S8_UInt;
                 ldi_hierarchy[i].stencilFormat = UnityEngine.Experimental.Rendering.GraphicsFormat.R8_UInt;
                 ldi_hierarchy[i].enableRandomWrite = true;
-
-                command_buffer = new CommandBuffer();
-
-                depth_complexities = new RenderTexture(ldi_resolution.x, ldi_resolution.y, 0, RenderTextureFormat.R8, 0);
-                depth_complexities.enableRandomWrite = true;
             }
-           
-        }    
+
+            command_buffer = new CommandBuffer();
+
+            depth_complexities = new RenderTexture(ldi_resolution.x, ldi_resolution.y, 0, RenderTextureFormat.R8, 0);
+            depth_complexities.enableRandomWrite = true;
+
+            does_collide_buffer = new ComputeBuffer(1, sizeof(int));
+
+            AABB = gameObject.AddComponent<BoxCollider>();
+            AABB.size = mesh_filter.mesh.bounds.size;
+        }
+
+        is_initialized = true;
     }
 
     void render_ldi_layer(Material material, int ldi_hierarchy_target_index)
@@ -122,14 +141,99 @@ public class LDI : MonoBehaviour
         }
     }
 
-    void Update()
+    void _does_collide_step(RenderTexture a_begin, RenderTexture a_end, Matrix4x4 screen_to_world_matrix_a, RenderTexture b_begin, RenderTexture b_end, Matrix4x4 screen_to_world_matrix_b)
     {
-        if (mesh_filter == null)
-            return;
+        int kernel = compute_ldi.FindKernel("does_collide");
+        compute_ldi.SetTexture(kernel, "object_a_begin", a_begin);
+        compute_ldi.SetTexture(kernel, "object_a_end", a_end);
+        compute_ldi.SetTexture(kernel, "object_b_begin", b_begin);
+        compute_ldi.SetTexture(kernel, "object_b_end", b_end);
+        compute_ldi.SetBuffer(kernel, "does_collide_buffer", does_collide_buffer);
+        compute_ldi.SetVector("texture_resolution", new Vector2(a_begin.width, a_begin.height));
+        compute_ldi.SetMatrix("screen_to_world_matrix_a", screen_to_world_matrix_a);
+        compute_ldi.SetMatrix("screen_to_world_matrix_b", screen_to_world_matrix_b);
+
+        compute_ldi.Dispatch(kernel, Mathf.CeilToInt(a_begin.width / 8.0f), Mathf.CeilToInt(a_begin.height / 8.0f), 1);
+    }
+
+    void _set_collide_buffer()
+    {
+        int kernel = compute_ldi.FindKernel("set_collide_buffer");
+        compute_ldi.SetBuffer(kernel, "does_collide_buffer", does_collide_buffer);
+
+        compute_ldi.Dispatch(kernel, 1, 1, 1);
+    }
+
+    void _reset_collide_buffer()
+    {
+        int kernel = compute_ldi.FindKernel("reset_collide_buffer");
+        compute_ldi.SetBuffer(kernel, "does_collide_buffer", does_collide_buffer);
+
+        compute_ldi.Dispatch(kernel, 1, 1, 1);
+    }
+
+    void compute_collision(List<RenderTexture> ldi0, Matrix4x4 screen_to_world_matrix0, List<RenderTexture> ldi1, Matrix4x4 screen_to_world_matrix1)
+    {
+        _reset_collide_buffer();
+
+        int n1 = ldi0.Count;
+        int n2 = ldi1.Count;
+
+        for (int i = 0; i < n1; i += 2)
+        {
+            for (int j = 0; j < n2; j += 2)
+            {
+                _does_collide_step(ldi0[i], ldi0[i+1], screen_to_world_matrix0, ldi1[j], ldi1[j+1], screen_to_world_matrix1);
+            }
+        }
+
+        int[] collision_result = new int[1];
+        does_collide_buffer.GetData(collision_result, 0, 0, 1);
+        Debug.Log(collision_result[0]);
+    }
+
+    private void OnCollisionEnter(Collision collision)
+    {
+        if (collisions.ContainsKey(collision.gameObject)) return;
+        
+        LDI ldi = collision.gameObject.GetComponent<LDI>();
+        collisions.Add(collision.gameObject, ldi);
+    }
+
+    private void OnCollisionExit(Collision collision)
+    {
+        collisions.Remove(collision.gameObject);   
+    }
+
+    private void Start()
+    {
+        init();
 
         render_ldi_hierarchy();
         blit_stencil_to_color_texture(ldi_hierarchy[0], depth_complexities);
 
         sort_ldi_hierarchy_with_depth_complexity(depth_complexities);
+
     }
+
+    static float collision_test_period_miliseconds = 16;
+    static float time_since_collision_test_miliseconds = 0;
+
+    void Update()
+    {
+        if (mesh_filter == null)
+            return;
+
+        time_since_collision_test_miliseconds += Time.deltaTime;
+        if (time_since_collision_test_miliseconds >= collision_test_period_miliseconds)
+        {
+            
+            compute_collision(ldi_hierarchy, Matrix4x4.identity, ldi_hierarchy, Matrix4x4.identity);
+
+
+            time_since_collision_test_miliseconds -= collision_test_period_miliseconds;
+        }
+    }
+
+
 }

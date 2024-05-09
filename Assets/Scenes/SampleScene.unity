@@ -134,7 +134,6 @@ GameObject:
   - component: {fileID: 497508140}
   - component: {fileID: 497508139}
   - component: {fileID: 497508138}
-  - component: {fileID: 497508137}
   - component: {fileID: 497508136}
   m_Layer: 0
   m_Name: sphere
@@ -159,22 +158,11 @@ MonoBehaviour:
   ldi_hierarchy: []
   material_first_pass: {fileID: 2100000, guid: 111ccba31f76e844fb3b035d799514e3, type: 2}
   material_second_pass: {fileID: 2100000, guid: 5fa1dcc8e30b59b4f9de0c5fd8970975, type: 2}
-  camera: {fileID: 1235736609}
   compute_ldi: {fileID: 7200000, guid: fd1f0b8fc5a317445a27f44749f29708, type: 3}
+  camera: {fileID: 1235736609}
   max_ldi_hierarchy_size: 16
---- !u!135 &497508137
-SphereCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 497508135}
-  m_Material: {fileID: 0}
-  m_IsTrigger: 0
-  m_Enabled: 1
-  serializedVersion: 2
-  m_Radius: 0.5
-  m_Center: {x: 0, y: 0, z: 0}
+  depth_complexities: {fileID: 0}
+  AABB: {fileID: 0}
 --- !u!23 &497508138
 MeshRenderer:
   m_ObjectHideFlags: 0
@@ -233,7 +221,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 497508135}
   m_LocalRotation: {x: -0, y: 0.9588186, z: -0, w: 0.28401914}
-  m_LocalPosition: {x: -8.28, y: -2.8019114, z: -6.22}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 5.9350696, y: 5.9350696, z: 5.9350696}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -273,7 +261,7 @@ Camera:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1235736607}
-  m_Enabled: 1
+  m_Enabled: 0
   serializedVersion: 2
   m_ClearFlags: 1
   m_BackGroundColor: {r: 0.19215687, g: 0.3019608, b: 0.4745098, a: 0}
@@ -289,11 +277,11 @@ Camera:
     y: 0
     width: 1
     height: 1
-  near clip plane: 0.3
-  far clip plane: 50
+  near clip plane: -8
+  far clip plane: 8
   field of view: 26.991467
   orthographic: 1
-  orthographic size: 6.5360804
+  orthographic size: 8
   m_Depth: 0
   m_CullingMask:
     serializedVersion: 2
@@ -317,7 +305,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1235736607}
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -8.1, y: -2.8019114, z: -22.87}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []

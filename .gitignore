@@ -10,3 +10,4 @@
 DepthPeeling.sln
 *.meta
 .vsconfig
+/Temp

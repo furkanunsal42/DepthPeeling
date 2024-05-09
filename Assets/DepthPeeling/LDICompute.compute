@@ -1,6 +1,9 @@
 #pragma kernel sort_textures
 #pragma kernel sort_textures_with_depth_complexities
 #pragma kernel blit_stencil_to_color
+#pragma kernel does_collide
+#pragma kernel set_collide_buffer
+#pragma kernel reset_collide_buffer
 
 RWTexture2D<float> texture_a;
 RWTexture2D<float> texture_b;
@@ -34,7 +37,7 @@ void sort_textures_with_depth_complexities(uint3 id : SV_DispatchThreadID)
     if (depth_complexity == 0)
         value_a = 1;
     
-    if (depth_complexity <= comperison_index)
+    if (depth_complexity <= comperison_index + 1)
         value_b = 1;
     
     texture_a[id.xy] = min(value_a, value_b);
@@ -51,5 +54,49 @@ void blit_stencil_to_color(uint3 id : SV_DispatchThreadID)
 {
     if (any(id.xy >= texture_resolution || id.xy < int2(0, 0))) return;
     
-    target_color_texture[id.xy] = stencil_texture[id.xy].g / 32.0f;
+    target_color_texture[id.xy] = stencil_texture[id.xy].g / max_stencil_value;
+}
+
+
+RWTexture2D<float> object_a_begin;
+RWTexture2D<float> object_a_end;
+RWTexture2D<float> object_b_begin;
+RWTexture2D<float> object_b_end;
+// texture_resolution
+RWStructuredBuffer<int> does_collide_buffer;
+#define INT_FALSE 0
+#define INT_TRUE 1
+
+float4x4 screen_to_world_matrix_a;
+float4x4 screen_to_world_matrix_b;
+
+[numthreads(8, 8, 1)]
+void does_collide(uint3 id : SV_DispatchThreadID)
+{
+    if (any(id.xy >= texture_resolution || id.xy < int2(0, 0))) return;
+ 
+    float a_range_begin = object_a_begin[id.xy].r;
+    float a_range_end   = object_a_end[id.xy].r;
+    float b_range_begin = object_b_begin[id.xy].r;
+    float b_range_end   = object_b_end[id.xy].r;
+    
+    bool collision = (b_range_begin >= a_range_begin && b_range_begin <= a_range_end);  //  [ ( ]
+    collision      = collision || (b_range_end   >= a_range_begin && b_range_end   <= a_range_end);  //  [ ) ]
+    collision      = collision || (b_range_begin <= a_range_begin && b_range_end   >= a_range_end);  //  ( [ ] ) 
+    
+    does_collide_buffer[0] = does_collide_buffer[0] || (collision ? INT_TRUE : INT_FALSE);
+}
+
+// does_collide_buffer
+
+[numthreads(1, 1, 1)]
+void set_collide_buffer(uint3 id : SV_DispatchThreadID)
+{
+    does_collide_buffer[0] = INT_TRUE;
+}
+
+[numthreads(1, 1, 1)]
+void reset_collide_buffer(uint3 id : SV_DispatchThreadID)
+{
+    does_collide_buffer[0] = INT_FALSE;
 }

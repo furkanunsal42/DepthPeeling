@@ -1,4 +1,4 @@
-Shader "Unlit/LDISecondPass"
+Shader "Unlit/LDIFirstPass"
 {
     Properties
     {
